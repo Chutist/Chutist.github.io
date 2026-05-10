@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MOTOR_CTRL_V2</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg: #000000;
+            --surface: #111111;
+            --border: #333333;
+            --text: #e0e0e0;
+            --dim: #666666;
+            --accent: #ff4500; /* Safety Orange */
+            --danger: #ff0000;
+            --mono: 'Courier New', Courier, monospace;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        
+        body { 
+            font-family: var(--mono); 
+            background: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            padding: 20px; 
+            text-align: left;
+            text-transform: uppercase;
+        }
+
+        h3 { margin: 0 0 10px 0; font-weight: normal; letter-spacing: 1px; font-size: 14px; color: var(--dim); border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+
+        /* CONTAINERS */
+        .panel { 
+            border: 1px solid var(--border); 
+            background: var(--surface); 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            max-width: 450px; 
+            margin-left: auto; 
+            margin-right: auto;
+        }
+
+        /* BUTTONS */
+        button {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 15px;
+            font-family: var(--mono);
+            font-size: 12px;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            transition: background 0.1s;
+        }
+        button:active { background: var(--border); }
+        button.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: bold; }
+        button:disabled { color: var(--dim); border-color: #222; cursor: not-allowed; }
+
+        .btn-stop { color: var(--danger); border-color: var(--danger); font-weight: bold; }
+        .btn-stop:active { background: var(--danger); color: #000; }
+
+        /* INPUTS */
+        input[type=text] {
+            background: #000; color: var(--accent); border: 1px solid var(--border);
+            font-family: var(--mono); font-size: 24px; text-align: center;
+            width: 100%; padding: 10px; outline: none;
+        }
+        
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; height: 30px; background: transparent;
+            border: 1px solid var(--border); margin: 20px 0;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 30px; width: 30px;
+            background: var(--accent); border: none;
+        }
+
+        /* GRID */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: -1px; } 
+        .grid-2 button { margin: 0; }
+
+        /* TOUCHPAD */
+        #touchpad {
+            width: 100%; height: 300px;
+            background-color: #050505;
+            background-image:
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 20px 20px;
+            border: 1px solid var(--border);
+            position: relative; touch-action: none; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #touchMarker {
+            width: 100%; height: 1px; background: var(--accent);
+            position: absolute; display: none; pointer-events: none;
+        }
+        .tp-hint { color: var(--dim); font-size: 10px; }
+
+        /* MIC METER */
+        #micArea { border: 1px solid var(--border); padding: 10px; background: #050505; }
+        #micMeter { width: 100%; height: 30px; background: #000; border: 1px solid var(--border); position: relative; overflow: hidden; }
+        #micBar { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: var(--accent); transition: width 60ms linear; }
+        .mic-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--dim); margin: 8px 0 4px; }
+
+        /* DISPLAY */
+        .data-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+        .data-val { color: var(--accent); }
+        .big-display { font-size: 48px; color: var(--text); border: 1px solid var(--border); background: #000; text-align: right; padding: 10px; margin: 10px 0; }
+
+        #log { font-size: 10px; color: var(--dim); height: 80px; overflow-y: auto; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. LOGIN -->
+    <div id="loginScreen" class="panel">
+        <h3>SYSTEM_LOGIN</h3>
+        <button onclick="startDeviceMode()" style="margin-bottom: 10px;">INIT_DEVICE_NODE</button>
+        <button onclick="startRemoteMode()">INIT_REMOTE_NODE</button>
+    </div>
+
+    <!-- 2. DEVICE STATUS PANEL -->
+    <div id="deviceUI" class="panel hidden">
+        <h3>NODE_STATUS: HOST</h3>
+        
+        <div class="data-row">
+            <span>BLE_LINK</span>
+            <span id="btStatus">OFFLINE</span>
+        </div>
+        <button onclick="connectBluetooth()" id="btBtn">ESTABLISH_BLE_LINK</button>
+        
+        <div class="data-row" style="margin-top: 15px;">
+            <span>NET_ID</span>
+        </div>
+        <div id="myPeerId" class="big-display" style="text-align: center; color: var(--accent); font-size: 32px;">----</div>
+        <div id="log">SYSTEM_LOG_START...</div>
+    </div>
+
+    <!-- 3. REMOTE STATUS PANEL -->
+    <div id="remoteUI" class="panel hidden">
+        <h3>NODE_STATUS: REMOTE</h3>
+        <input type="text" id="targetIdInput" placeholder="ENTER_ID" maxlength="4" inputmode="numeric">
+        <button onclick="connectToDevice()" id="connectRemoteBtn">CONNECT_TO_TARGET</button>
+    </div>
+
+    <!-- PIP KEEP-ALIVE (Android, both nodes) -->
+    <video id="pipVideo" muted playsinline autoplay style="position:fixed; width:1px; height:1px; right:0; bottom:0; opacity:0.01; pointer-events:none;"></video>
+
+    <!-- 4. SHARED CONTROL PANEL (Visible to both) -->
+    <div id="sharedControls" class="panel hidden">
+        <h3>MANUAL_OVERRIDE</h3>
+
+        <div style="border: 1px solid var(--border); padding: 1px;">
+            <div class="grid-2">
+                <button onclick="setMode('STEADY')" id="btn-STEADY" class="active">MANUAL</button>
+                <button onclick="setMode('PULSE')" id="btn-PULSE">PULSE</button>
+                <button onclick="setMode('WAVE')" id="btn-WAVE">WAVE</button>
+                <button onclick="setMode('BURST')" id="btn-BURST">BURST</button>
+                <button onclick="setMode('RANDOM')" id="btn-RANDOM">RANDOM</button>
+                <button onclick="setMode('TOUCH')" id="btn-TOUCH">TOUCH</button>
+            </div>
+            <button onclick="setMode('MIC')" id="btn-MIC" style="border-top: 1px solid var(--border);">MIC_AMPLITUDE</button>
+            <button onclick="triggerStop()" class="btn-stop" style="border-top: 1px solid var(--border);">ALL_STOP</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <div class="data-row">
+                <span>OUTPUT_LEVEL</span>
+                <span id="displayVal" class="data-val">0%</span>
+            </div>
+            
+            <div id="sliderArea">
+                <input type="range" id="slider" min="0" max="100" value="0" oninput="handleInput(this.value)">
+            </div>
+
+            <div id="touchpad" class="hidden">
+                <div class="tp-hint">Y_AXIS_CONTROL</div>
+                <div id="touchMarker"></div>
+            </div>
+
+            <div id="micArea" class="hidden">
+                <div class="mic-row"><span>MIC_INPUT</span><span id="micStatus">REQUESTING...</span></div>
+                <div id="micMeter"><div id="micBar"></div></div>
+                <div class="mic-row" style="margin-top:14px;"><span>SENSITIVITY</span><span id="micGainVal" class="data-val">5x</span></div>
+                <input type="range" id="micGain" min="1" max="20" value="5" style="margin: 5px 0;">
+                <div class="mic-row"><span>NOISE_GATE</span><span id="micGateVal" class="data-val">5%</span></div>
+                <input type="range" id="micGate" min="0" max="50" value="5" style="margin: 5px 0;">
+            </div>
+        </div>
+    </div>
+
+<script>
+    const SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+    const WRITE_UUID   = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+    const ICE_SERVERS  = [{ urls: 'stun:stun.l.google.com:19302' }];
+    const SEND_INTERVAL = 50; 
+
+    // System State
+    let isHost = false; // TRUE = Device/Phone, FALSE = Remote
+    let peer, conn, btChar;
+    
+    // Motor State
+    let currentMode = 'STEADY';
+    let lastSentVal = -1;
+    let loopId = null;
+    let sendTimer = null;
+    let pendingVal = null;
+    const encoder = new TextEncoder();
+
+    // ==========================================
+    //  INPUT HANDLERS (Shared)
+    // ==========================================
+    
+    // Called by Slider or Touchpad
+    function handleInput(val) {
+        val = parseInt(val);
+        document.getElementById('displayVal').innerText = val + "%";
+        
+        // If Host: Execute Locally immediately
+        if (isHost) {
+            handleLocalCommand(val);
+        } else {
+            // If Remote: Queue for Network
+            queueNetworkUpdate(val);
+        }
+    }
+
+    function triggerStop() {
+        document.getElementById('slider').value = 0;
+        document.getElementById('displayVal').innerText = "0%";
+        
+        if (isHost) {
+            handleCommand({ mode: 'STOP' });
+        } else {
+            if (conn && conn.open) conn.send({ mode: 'STOP' });
+            setMode('STEADY');
+        }
+    }
+
+    function setMode(mode) {
+        const prevMode = currentMode;
+        currentMode = mode;
+
+        // Attempt PiP keep-alive on user gesture (no-op if already active / not Android)
+        enablePiPKeepAlive();
+
+        // Cleanup mic when leaving MIC mode
+        if (prevMode === 'MIC' && mode !== 'MIC') {
+            stopMicCapture();
+        }
+
+        // UI Update
+        document.querySelectorAll('#sharedControls button').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + mode).classList.add('active');
+
+        // View Toggle
+        document.getElementById('sliderArea').classList.add('hidden');
+        document.getElementById('touchpad').classList.add('hidden');
+        document.getElementById('micArea').classList.add('hidden');
+        if (mode === 'TOUCH') {
+            document.getElementById('touchpad').classList.remove('hidden');
+        } else if (mode === 'MIC') {
+            document.getElementById('micArea').classList.remove('hidden');
+        } else {
+            document.getElementById('sliderArea').classList.remove('hidden');
+        }
+
+        // Reset Values
+        document.getElementById('slider').value = 0;
+        document.getElementById('displayVal').innerText = "0%";
+
+        // Logic
+        if (isHost) {
+            // Local: Change Mode logic
+            handleCommand({ mode: mode, val: 0 });
+        } else {
+            // Remote: Send Mode Change, force val 0
+            forceNetworkSend(0);
+        }
+
+        // Mic permission is requested ON CLICK (here), not at startup
+        if (mode === 'MIC') {
+            startMicCapture();
+        }
+    }
+
+    // ==========================================
+    //  HOST LOGIC (Device)
+    // ==========================================
+    function startDeviceMode() {
+        isHost = true;
+        show('deviceUI');
+        document.getElementById('sharedControls').classList.remove('hidden'); // Show controls immediately
+
+        // Fire PiP keep-alive inside the INIT tap gesture (Android only)
+        enablePiPKeepAlive();
+
+        const shortId = Math.floor(1000 + Math.random() * 9000).toString();
+        peer = new Peer(shortId, { config: { iceServers: ICE_SERVERS } });
+        
+        peer.on('open', id => document.getElementById('myPeerId').innerText = id);
+        
+        peer.on('connection', c => {
+            conn = c;
+            conn.on('open', () => log("REMOTE_LINKED"));
+            conn.on('data', data => handleCommand(data));
+            conn.on('close', () => log("REMOTE_LOST"));
+        });
+    }
+
+    // Handles commands from Network OR Local UI
+    function handleCommand(data) {
+        // Stop Logic
+        if (data.mode === 'STOP') {
+            stopLoop();
+            writeToBluetooth(0);
+            currentMode = 'STEADY';
+            if(isHost) setMode('STEADY'); // Sync UI
+            log("CMD: STOP");
+            return;
+        }
+
+        // Mode Switch Logic
+        if (data.mode && data.mode !== currentMode) {
+            currentMode = data.mode;
+            stopLoop();
+            writeToBluetooth(0);
+            
+            // Sync UI if command came from Remote
+            if (isHost) {
+                document.querySelectorAll('#sharedControls button').forEach(b => b.classList.remove('active'));
+                document.getElementById('btn-' + currentMode).classList.add('active');
+            }
+
+            setTimeout(() => {
+                if (currentMode !== 'STEADY' && currentMode !== 'TOUCH' && currentMode !== 'MIC') {
+                    startLoop(data.val);
+                }
+            }, 50);
+        }
+        // Value Update Logic
+        else {
+            if (currentMode === 'STEADY' || currentMode === 'TOUCH' || currentMode === 'MIC') {
+                writeToBluetooth(mapMotor(data.val));
+            } else {
+                startLoop(data.val);
+            }
+        }
+    }
+
+    // Direct Local Control wrapper
+    function handleLocalCommand(val) {
+        if (currentMode === 'STEADY' || currentMode === 'TOUCH' || currentMode === 'MIC') {
+            writeToBluetooth(mapMotor(val));
+        } else {
+            startLoop(val);
+        }
+    }
+
+    function mapMotor(val) {
+        if (val <= 5) return 0; 
+        return Math.floor(((val - 6) / 94) * 115 + 140);
+    }
+
+    // ==========================================
+    //  REMOTE LOGIC
+    // ==========================================
+    function startRemoteMode() {
+        isHost = false;
+        show('remoteUI');
+        peer = new Peer(null, { config: { iceServers: ICE_SERVERS } });
+    }
+
+    function connectToDevice() {
+        const code = document.getElementById('targetIdInput').value;
+        if (!code) return alert("NO_ID");
+        document.getElementById('connectRemoteBtn').innerText = "CONNECTING...";
+
+        // Fire PiP keep-alive inside the user gesture (Android only)
+        enablePiPKeepAlive();
+
+        conn = peer.connect(code);
+
+        conn.on('open', () => {
+            document.getElementById('connectRemoteBtn').innerText = "LINK_ESTABLISHED";
+            document.getElementById('connectRemoteBtn').style.color = "var(--accent)";
+            document.getElementById('remoteUI').classList.add('hidden'); // Hide login inputs
+            document.getElementById('sharedControls').classList.remove('hidden'); // Show controls
+        });
+    }
+
+    // ==========================================
+    //  PIP KEEP-ALIVE (prevents Android background throttling)
+    // ==========================================
+    let pipStreamReady = false;
+    function preparePiPStream() {
+        if (pipStreamReady) return;
+        const video = document.getElementById('pipVideo');
+        const canvas = document.createElement('canvas');
+        canvas.width = 160; canvas.height = 90;
+        const ctx = canvas.getContext('2d');
+        let tick = 0;
+        (function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ff4500';
+            ctx.font = '14px monospace';
+            ctx.fillText('LINK ACTIVE', 10, 30);
+            ctx.fillStyle = '#e0e0e0';
+            ctx.fillText(String(tick++), 10, 55);
+            requestAnimationFrame(draw);
+        })();
+        const stream = canvas.captureStream(10);
+        video.srcObject = stream;
+        pipStreamReady = true;
+    }
+
+    async function enablePiPKeepAlive() {
+        if (!/Android/i.test(navigator.userAgent)) return;
+        if (!('pictureInPictureEnabled' in document) || !document.pictureInPictureEnabled) return;
+
+        try {
+            preparePiPStream();
+            const video = document.getElementById('pipVideo');
+            if (document.pictureInPictureElement === video) return;
+            await video.play();
+            await video.requestPictureInPicture();
+        } catch (e) {
+            // User may have dismissed or browser blocked; silent fail
+        }
+    }
+
+    // Throttled Network Sending
+    function queueNetworkUpdate(val) {
+        pendingVal = val;
+        if (!sendTimer) sendTimer = setTimeout(flushNetworkData, SEND_INTERVAL);
+    }
+
+    function flushNetworkData() {
+        if (pendingVal !== null && pendingVal !== lastSentVal) {
+            if (conn && conn.open) {
+                conn.send({ mode: currentMode, val: pendingVal });
+                lastSentVal = pendingVal;
+            }
+        }
+        sendTimer = null;
+        if (pendingVal !== lastSentVal) sendTimer = setTimeout(flushNetworkData, SEND_INTERVAL);
+    }
+
+    function forceNetworkSend(val) {
+        if (sendTimer) clearTimeout(sendTimer);
+        sendTimer = null;
+        pendingVal = val;
+        flushNetworkData();
+    }
+
+    // ==========================================
+    //  ANIMATION LOOP (20Hz)
+    // ==========================================
+    let animTick = 0;
+    function startLoop(param) {
+        if (loopId) clearInterval(loopId);
+        loopId = setInterval(() => {
+            let output = 0;
+            const speed = Math.max(1, param);
+
+            switch (currentMode) {
+                case 'PULSE': 
+                    const p_cycle = Math.max(4, 40 - (speed / 3)); 
+                    output = (animTick % p_cycle < p_cycle/2) ? 255 : 0; break;
+                case 'WAVE':
+                    const freq = speed / 10; 
+                    const sine = Math.sin(animTick * freq);
+                    output = Math.floor(((sine + 1) / 2) * 115) + 140; break;
+                case 'BURST':
+                    const b_cycle = animTick % (40 - (speed/4)); 
+                    output = (b_cycle < 2 || (b_cycle > 4 && b_cycle < 6)) ? 255 : 0; break;
+                case 'RANDOM':
+                    if (animTick % 5 === 0) output = Math.random() > 0.5 ? 255 : 0; else return; break;
+            }
+            animTick++;
+            if (output > 0) output = Math.round(output / 5) * 5; 
+            writeToBluetooth(output);
+        }, 50); 
+    }
+
+    function stopLoop() {
+        if (loopId) clearInterval(loopId);
+        loopId = null;
+    }
+
+    // ==========================================
+    //  MIC AMPLITUDE MODE
+    // ==========================================
+    let micStream = null;
+    let micCtx = null;
+    let micAnalyser = null;
+    let micRafId = null;
+    let micSmoothed = 0;
+
+    async function startMicCapture() {
+        if (micStream) return;
+        const statusEl = document.getElementById('micStatus');
+        const barEl = document.getElementById('micBar');
+        statusEl.innerText = "REQUESTING...";
+        statusEl.style.color = "var(--dim)";
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            });
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            micCtx = new Ctx();
+            const src = micCtx.createMediaStreamSource(micStream);
+            micAnalyser = micCtx.createAnalyser();
+            micAnalyser.fftSize = 1024;
+            src.connect(micAnalyser);
+            const buf = new Uint8Array(micAnalyser.fftSize);
+            statusEl.innerText = "LIVE";
+            statusEl.style.color = "var(--accent)";
+
+            const gainEl = document.getElementById('micGain');
+            const gainValEl = document.getElementById('micGainVal');
+            const gateEl = document.getElementById('micGate');
+            const gateValEl = document.getElementById('micGateVal');
+            gainEl.oninput = () => gainValEl.innerText = gainEl.value + "x";
+            gateEl.oninput = () => gateValEl.innerText = gateEl.value + "%";
+
+            micSmoothed = 0;
+            (function tick() {
+                if (currentMode !== 'MIC' || !micAnalyser) { micRafId = null; return; }
+                micAnalyser.getByteTimeDomainData(buf);
+                let sum = 0;
+                for (let i = 0; i < buf.length; i++) {
+                    const v = (buf[i] - 128) / 128;
+                    sum += v * v;
+                }
+                const rms = Math.sqrt(sum / buf.length);
+                const gain = parseInt(gainEl.value) || 5;
+                const gate = parseInt(gateEl.value) || 0;
+                let raw = Math.min(100, rms * gain * 100);
+                if (raw < gate) raw = 0;
+                else raw = ((raw - gate) / (100 - gate)) * 100;
+                micSmoothed = micSmoothed * 0.55 + raw * 0.45;
+                const level = Math.max(0, Math.min(100, Math.floor(micSmoothed)));
+                barEl.style.width = level + "%";
+                handleInput(level);
+                micRafId = requestAnimationFrame(tick);
+            })();
+        } catch (e) {
+            statusEl.innerText = "DENIED";
+            statusEl.style.color = "var(--danger)";
+            log("MIC_ERR: " + e.message);
+            stopMicCapture();
+            setMode('STEADY');
+        }
+    }
+
+    function stopMicCapture() {
+        if (micRafId) cancelAnimationFrame(micRafId);
+        micRafId = null;
+        if (micStream) {
+            micStream.getTracks().forEach(t => t.stop());
+            micStream = null;
+        }
+        if (micCtx) {
+            try { micCtx.close(); } catch (e) {}
+            micCtx = null;
+        }
+        micAnalyser = null;
+        const bar = document.getElementById('micBar');
+        if (bar) bar.style.width = "0%";
+        // Force motor to zero on exit
+        if (isHost) handleLocalCommand(0); else forceNetworkSend(0);
+    }
+
+    // ==========================================
+    //  BLUETOOTH
+    // ==========================================
+    let lastWrittenVal = -1;
+    let btWriteInProgress = false;
+
+    async function connectBluetooth() {
+        // Fire PiP keep-alive inside the user gesture (Android only)
+        enablePiPKeepAlive();
+        try {
+            const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService(SERVICE_UUID);
+            btChar = await service.getCharacteristic(WRITE_UUID);
+            
+            document.getElementById('btStatus').innerText = "ONLINE";
+            document.getElementById('btStatus').style.color = "var(--accent)";
+            document.getElementById('btBtn').style.display = 'none';
+        } catch (e) { log("BT_ERR: " + e.message); }
+    }
+
+    async function writeToBluetooth(val) {
+        if (!btChar) return;
+        val = Math.floor(val); 
+        if (val === lastWrittenVal) return;
+        if (btWriteInProgress) return;
+
+        try {
+            btWriteInProgress = true;
+            const data = encoder.encode(val + "\n");
+            await btChar.writeValueWithoutResponse(data);
+            lastWrittenVal = val;
+        } catch(e) { } finally { btWriteInProgress = false; }
+    }
+
+    // ==========================================
+    //  UI UTILS
+    // ==========================================
+    const tp = document.getElementById('touchpad');
+    const mark = document.getElementById('touchMarker');
+
+    tp.addEventListener('pointerdown', e => { mark.style.display = 'block'; handleTouch(e); });
+    tp.addEventListener('pointermove', e => { if (e.buttons > 0) handleTouch(e); });
+    tp.addEventListener('pointerup', () => { 
+        mark.style.display = 'none'; 
+        handleInput(0); // Instant zero on release
+    });
+
+    function handleTouch(e) {
+        e.preventDefault();
+        const rect = tp.getBoundingClientRect();
+        let y = 100 - ((e.clientY - rect.top) / rect.height * 100);
+        y = Math.max(0, Math.min(100, Math.floor(y)));
+        mark.style.top = (e.clientY - rect.top) + 'px';
+        handleInput(y);
+    }
+
+    function show(id) {
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById(id).classList.remove('hidden');
+    }
+    function log(msg) {
+        const l = document.getElementById('log');
+        l.innerHTML = `> ${msg}<br>` + l.innerHTML;
+    }
+</script>
+</body>
+</html>
