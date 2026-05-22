@@ -363,10 +363,15 @@
         }
     }
 
-    function mapMotor(val) {
-        if (val <= 5) return 0; 
-        return Math.floor(((val - 6) / 94) * 115 + 140);
-    }
+function mapMotor(val) {
+    if (val <= 2) return 0; // Šalje čistu nulu za aktivaciju kočnice
+    
+    // 65 je početna snaga koja preskače mrtvu zonu. 
+    // Ako ti na 3% i dalje malo stoji, slobodno podigni ovaj broj na 75 ili 80.
+    const minPwm = 65; 
+    
+    return Math.floor(((val / 100) * (255 - minPwm)) + minPwm);
+}
 
     // ==========================================
     //  REMOTE LOGIC
