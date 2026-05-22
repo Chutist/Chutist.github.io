@@ -600,7 +600,7 @@
         } catch (e) { log("BT_ERR: " + e.message); }
     }
 
-    async function writeToBluetooth(val) {
+async function writeToBluetooth(val) {
         if (!btChar) return;
         val = Math.floor(val); 
         if (val === lastWrittenVal) return;
@@ -608,7 +608,10 @@
 
         try {
             btWriteInProgress = true;
-            const data = encoder.encode(val + "\n");
+            
+            // SEND AS A SINGLE BYTE (0x00 to 0xFF)
+            const data = new Uint8Array([val]);
+            
             await btChar.writeValueWithoutResponse(data);
             lastWrittenVal = val;
         } catch(e) { } finally { btWriteInProgress = false; }
