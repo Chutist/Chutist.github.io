@@ -364,12 +364,11 @@
     }
 
 function mapMotor(val) {
-    if (val <= 2) return 0; // Šalje čistu nulu za aktivaciju kočnice
+    if (val <= 2) return 0; // Sigurna nula za kočnicu na ESP32
     
-    // 65 je početna snaga koja preskače mrtvu zonu. 
-    // Ako ti na 3% i dalje malo stoji, slobodno podigni ovaj broj na 75 ili 80.
-    const minPwm = 65; 
+    const minPwm = 120; // Tvoj početni "kick" gdje motor zapravo kreće raditi
     
+    // Linearno pretvara slider (3% - 100%) u raspon od 120 do 255 PWM
     return Math.floor(((val / 100) * (255 - minPwm)) + minPwm);
 }
 
