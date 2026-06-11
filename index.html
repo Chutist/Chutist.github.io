@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOTOR_CTRL_V2</title>
+    <title>MOTOR_CTRL_V3</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         :root {
@@ -12,7 +12,7 @@
             --border: #333333;
             --text: #e0e0e0;
             --dim: #666666;
-            --accent: #ff4500; /* Safety Orange */
+            --accent: #b026ff; /* Electric Purple */
             --danger: #ff0000;
             --mono: 'Courier New', Courier, monospace;
         }
@@ -71,7 +71,7 @@
         
         input[type=range] {
             -webkit-appearance: none; width: 100%; height: 30px; background: transparent;
-            border: 1px solid var(--border); margin: 20px 0;
+            border: 1px solid var(--border); margin: 12px 0;
         }
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none; height: 30px; width: 30px;
@@ -118,14 +118,12 @@
 </head>
 <body>
 
-    <!-- 1. LOGIN -->
     <div id="loginScreen" class="panel">
         <h3>SYSTEM_LOGIN</h3>
         <button onclick="startDeviceMode()" style="margin-bottom: 10px;">INIT_DEVICE_NODE</button>
         <button onclick="startRemoteMode()">INIT_REMOTE_NODE</button>
     </div>
 
-    <!-- 2. DEVICE STATUS PANEL -->
     <div id="deviceUI" class="panel hidden">
         <h3>NODE_STATUS: HOST</h3>
         
@@ -142,17 +140,14 @@
         <div id="log">SYSTEM_LOG_START...</div>
     </div>
 
-    <!-- 3. REMOTE STATUS PANEL -->
     <div id="remoteUI" class="panel hidden">
         <h3>NODE_STATUS: REMOTE</h3>
         <input type="text" id="targetIdInput" placeholder="ENTER_ID" maxlength="4" inputmode="numeric">
         <button onclick="connectToDevice()" id="connectRemoteBtn">CONNECT_TO_TARGET</button>
     </div>
 
-    <!-- PIP KEEP-ALIVE (Android, both nodes) -->
     <video id="pipVideo" muted playsinline autoplay style="position:fixed; width:1px; height:1px; right:0; bottom:0; opacity:0.01; pointer-events:none;"></video>
 
-    <!-- 4. SHARED CONTROL PANEL (Visible to both) -->
     <div id="sharedControls" class="panel hidden">
         <h3>MANUAL_OVERRIDE</h3>
 
@@ -163,9 +158,12 @@
                 <button onclick="setMode('WAVE')" id="btn-WAVE">WAVE</button>
                 <button onclick="setMode('BURST')" id="btn-BURST">BURST</button>
                 <button onclick="setMode('RANDOM')" id="btn-RANDOM">RANDOM</button>
+                <button onclick="setMode('RAMP')" id="btn-RAMP">RAMP</button>
+                <button onclick="setMode('RHYTHM')" id="btn-RHYTHM">RHYTHM</button>
+                <button onclick="setMode('STAIRCASE')" id="btn-STAIRCASE">STAIRCASE</button>
                 <button onclick="setMode('TOUCH')" id="btn-TOUCH">TOUCH</button>
+                <button onclick="setMode('MIC')" id="btn-MIC">MIC_AMP</button>
             </div>
-            <button onclick="setMode('MIC')" id="btn-MIC" style="border-top: 1px solid var(--border);">MIC_AMPLITUDE</button>
             <button onclick="triggerStop()" class="btn-stop" style="border-top: 1px solid var(--border);">ALL_STOP</button>
         </div>
 
@@ -176,7 +174,65 @@
             </div>
             
             <div id="sliderArea">
-                <input type="range" id="slider" min="0" max="100" value="0" oninput="handleInput(this.value)">
+                <div id="control-STEADY" class="mode-controls">
+                    <div class="mic-row"><span>STRENGTH</span><span id="val-steadyStrength" class="data-val">0%</span></div>
+                    <input type="range" min="0" max="100" value="0" oninput="updateParam('steadyStrength', this.value)">
+                </div>
+
+                <div id="control-PULSE" class="mode-controls hidden">
+                    <div class="mic-row"><span>STRENGTH</span><span id="val-pulseStrength" class="data-val">100%</span></div>
+                    <input type="range" min="0" max="100" value="100" oninput="updateParam('pulseStrength', this.value)">
+                    <div class="mic-row"><span>ON DURATION</span><span id="val-pulseOn" class="data-val">50%</span></div>
+                    <input type="range" min="5" max="100" value="50" oninput="updateParam('pulseOn', this.value)">
+                    <div class="mic-row"><span>OFF DURATION</span><span id="val-pulseOff" class="data-val">50%</span></div>
+                    <input type="range" min="5" max="100" value="50" oninput="updateParam('pulseOff', this.value)">
+                </div>
+
+                <div id="control-WAVE" class="mode-controls hidden">
+                    <div class="mic-row"><span>AMPLITUDE (MAX)</span><span id="val-waveAmp" class="data-val">100%</span></div>
+                    <input type="range" min="0" max="100" value="100" oninput="updateParam('waveAmp', this.value)">
+                    <div class="mic-row"><span>FREQUENCY (SPEED)</span><span id="val-waveFreq" class="data-val">50%</span></div>
+                    <input type="range" min="5" max="100" value="50" oninput="updateParam('waveFreq', this.value)">
+                </div>
+
+                <div id="control-BURST" class="mode-controls hidden">
+                    <div class="mic-row"><span>BURST SPEED</span><span id="val-burstSpeed" class="data-val">50%</span></div>
+                    <input type="range" min="5" max="100" value="50" oninput="updateParam('burstSpeed', this.value)">
+                </div>
+
+                <div id="control-RANDOM" class="mode-controls hidden">
+                    <div class="mic-row"><span>MAX STRENGTH</span><span id="val-randomStrength" class="data-val">100%</span></div>
+                    <input type="range" min="0" max="100" value="100" oninput="updateParam('randomStrength', this.value)">
+                    <div class="mic-row"><span>RATE (SPEED)</span><span id="val-randomSpeed" class="data-val">50%</span></div>
+                    <input type="range" min="5" max="100" value="50" oninput="updateParam('randomSpeed', this.value)">
+                </div>
+
+                <div id="control-RAMP" class="mode-controls hidden">
+                    <div class="mic-row"><span>PEAK STRENGTH</span><span id="val-rampPeak" class="data-val">100%</span></div>
+                    <input type="range" min="0" max="100" value="100" oninput="updateParam('rampPeak', this.value)">
+                    <div class="mic-row"><span>ATTACK SPEED</span><span id="val-rampAttack" class="data-val">30%</span></div>
+                    <input type="range" min="5" max="100" value="30" oninput="updateParam('rampAttack', this.value)">
+                    <div class="mic-row"><span>DECAY SPEED</span><span id="val-rampDecay" class="data-val">30%</span></div>
+                    <input type="range" min="5" max="100" value="30" oninput="updateParam('rampDecay', this.value)">
+                </div>
+
+                <div id="control-RHYTHM" class="mode-controls hidden">
+                    <div class="mic-row"><span>MASTER STRENGTH</span><span id="val-rhythmStrength" class="data-val">100%</span></div>
+                    <input type="range" min="0" max="100" value="100" oninput="updateParam('rhythmStrength', this.value)">
+                    <div class="mic-row"><span>TEMPO / SPEED</span><span id="val-rhythmTempo" class="data-val">50%</span></div>
+                    <input type="range" min="5" max="100" value="50" oninput="updateParam('rhythmTempo', this.value)">
+                    <div class="mic-row"><span>PATTERN SELECT</span><span id="val-rhythmPattern" class="data-val">P1</span></div>
+                    <input type="range" min="0" max="99" value="0" oninput="updateParam('rhythmPattern', this.value)">
+                </div>
+
+                <div id="control-STAIRCASE" class="mode-controls hidden">
+                    <div class="mic-row"><span>MAX HEIGHT</span><span id="val-stairMax" class="data-val">100%</span></div>
+                    <input type="range" min="0" max="100" value="100" oninput="updateParam('stairMax', this.value)">
+                    <div class="mic-row"><span>STEP RESOLUTION</span><span id="val-stairSteps" class="data-val">4 STEPS</span></div>
+                    <input type="range" min="0" max="100" value="40" oninput="updateParam('stairSteps', this.value)">
+                    <div class="mic-row"><span>STEP DURATION</span><span id="val-stairDuration" class="data-val">30%</span></div>
+                    <input type="range" min="5" max="100" value="30" oninput="updateParam('stairDuration', this.value)">
+                </div>
             </div>
 
             <div id="touchpad" class="hidden">
@@ -202,38 +258,100 @@
     const SEND_INTERVAL = 50; 
 
     // System State
-    let isHost = false; // TRUE = Device/Phone, FALSE = Remote
+    let isHost = false; 
     let peer, conn, btChar;
     
-    // Motor State
+    // Motor State System Configuration
     let currentMode = 'STEADY';
-    let lastSentVal = -1;
     let loopId = null;
     let sendTimer = null;
-    let pendingVal = null;
+    let lastSentStr = "";
+    let pendingDirectVal = null;
     const encoder = new TextEncoder();
 
+    // Structural Parameter Objects
+    let modeParams = {
+        steadyStrength: 0,
+        pulseStrength: 100,
+        pulseOn: 50,
+        pulseOff: 50,
+        waveAmp: 100,
+        waveFreq: 50,
+        burstSpeed: 50,
+        randomStrength: 100,
+        randomSpeed: 50,
+        rampPeak: 100,
+        rampAttack: 30,
+        rampDecay: 30,
+        rhythmStrength: 100,
+        rhythmTempo: 50,
+        rhythmPattern: 0,
+        stairMax: 100,
+        stairSteps: 40,
+        stairDuration: 30
+    };
+
     // ==========================================
-    //  INPUT HANDLERS (Shared)
+    //  INPUT PARAMETER HANDLERS
     // ==========================================
-    
-    // Called by Slider or Touchpad
+    function updateParam(key, val) {
+        val = parseInt(val);
+        modeParams[key] = val;
+
+        const labelEl = document.getElementById('val-' + key);
+        if (labelEl) {
+            if (key === 'rhythmPattern') {
+                labelEl.innerText = "P" + (Math.min(3, Math.floor(val / 25)) + 1);
+            } else if (key === 'stairSteps') {
+                labelEl.innerText = (Math.max(2, Math.floor((val / 100) * 6) + 2)) + " STEPS";
+            } else {
+                labelEl.innerText = val + "%";
+            }
+        }
+
+        // Display updates
+        if (key === 'steadyStrength' && currentMode === 'STEADY') {
+            document.getElementById('displayVal').innerText = val + "%";
+        } else if (key === 'waveAmp' && currentMode === 'WAVE') {
+            document.getElementById('displayVal').innerText = val + "%";
+        } else if (key === 'pulseStrength' && currentMode === 'PULSE') {
+            document.getElementById('displayVal').innerText = val + "%";
+        } else if (key === 'randomStrength' && currentMode === 'RANDOM') {
+            document.getElementById('displayVal').innerText = val + "%";
+        } else if (key === 'rampPeak' && currentMode === 'RAMP') {
+            document.getElementById('displayVal').innerText = val + "%";
+        } else if (key === 'rhythmStrength' && currentMode === 'RHYTHM') {
+            document.getElementById('displayVal').innerText = val + "%";
+        } else if (key === 'stairMax' && currentMode === 'STAIRCASE') {
+            document.getElementById('displayVal').innerText = val + "%";
+        }
+
+        if (isHost) {
+            if (currentMode === 'STEADY') {
+                writeToBluetooth(mapMotor(modeParams.steadyStrength));
+            } else {
+                ensureLoopRunning();
+            }
+        } else {
+            queueNetworkParams();
+        }
+    }
+
     function handleInput(val) {
         val = parseInt(val);
         document.getElementById('displayVal').innerText = val + "%";
         
-        // If Host: Execute Locally immediately
         if (isHost) {
-            handleLocalCommand(val);
+            writeToBluetooth(mapMotor(val));
         } else {
-            // If Remote: Queue for Network
-            queueNetworkUpdate(val);
+            pendingDirectVal = val;
+            queueNetworkParams();
         }
     }
 
     function triggerStop() {
-        document.getElementById('slider').value = 0;
-        document.getElementById('displayVal').innerText = "0%";
+        modeParams.steadyStrength = 0;
+        syncUIToParams();
         
         if (isHost) {
             handleCommand({ mode: 'STOP' });
@@ -247,47 +365,77 @@
         const prevMode = currentMode;
         currentMode = mode;
 
-        // Attempt PiP keep-alive on user gesture (no-op if already active / not Android)
         enablePiPKeepAlive();
 
-        // Cleanup mic when leaving MIC mode
         if (prevMode === 'MIC' && mode !== 'MIC') {
             stopMicCapture();
         }
 
-        // UI Update
-        document.querySelectorAll('#sharedControls button').forEach(b => b.classList.remove('active'));
-        document.getElementById('btn-' + mode).classList.add('active');
+        updateUIForMode(mode);
+        syncUIToParams();
 
-        // View Toggle
-        document.getElementById('sliderArea').classList.add('hidden');
+        if (isHost) {
+            stopLoop();
+            writeToBluetooth(0);
+            
+            if (mode === 'STEADY') {
+                writeToBluetooth(mapMotor(modeParams.steadyStrength));
+            } else if (mode !== 'TOUCH' && mode !== 'MIC') {
+                ensureLoopRunning();
+            }
+        } else {
+            forceNetworkSend();
+        }
+
+        if (mode === 'MIC') {
+            startMicCapture();
+        }
+    }
+
+    function updateUIForMode(mode) {
+        document.querySelectorAll('#sharedControls button').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.getElementById('btn-' + mode);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        document.querySelectorAll('.mode-controls').forEach(el => el.classList.add('hidden'));
         document.getElementById('touchpad').classList.add('hidden');
         document.getElementById('micArea').classList.add('hidden');
+
         if (mode === 'TOUCH') {
             document.getElementById('touchpad').classList.remove('hidden');
         } else if (mode === 'MIC') {
             document.getElementById('micArea').classList.remove('hidden');
         } else {
-            document.getElementById('sliderArea').classList.remove('hidden');
+            const explicitPanel = document.getElementById('control-' + mode);
+            if (explicitPanel) explicitPanel.classList.remove('hidden');
         }
+    }
 
-        // Reset Values
-        document.getElementById('slider').value = 0;
-        document.getElementById('displayVal').innerText = "0%";
-
-        // Logic
-        if (isHost) {
-            // Local: Change Mode logic
-            handleCommand({ mode: mode, val: 0 });
-        } else {
-            // Remote: Send Mode Change, force val 0
-            forceNetworkSend(0);
+    function syncUIToParams() {
+        for (let key in modeParams) {
+            const inputEl = document.querySelector(`[oninput*="'${key}'"]`);
+            if (inputEl) inputEl.value = modeParams[key];
+            const labelEl = document.getElementById('val-' + key);
+            if (labelEl) {
+                if (key === 'rhythmPattern') {
+                    labelEl.innerText = "P" + (Math.min(3, Math.floor(modeParams[key] / 25)) + 1);
+                } else if (key === 'stairSteps') {
+                    labelEl.innerText = (Math.max(2, Math.floor((modeParams[key] / 100) * 6) + 2)) + " STEPS";
+                } else {
+                    labelEl.innerText = modeParams[key] + "%";
+                }
+            }
         }
-
-        // Mic permission is requested ON CLICK (here), not at startup
-        if (mode === 'MIC') {
-            startMicCapture();
-        }
+        
+        const mainDisplay = document.getElementById('displayVal');
+        if (currentMode === 'STEADY') mainDisplay.innerText = modeParams.steadyStrength + "%";
+        if (currentMode === 'WAVE') mainDisplay.innerText = modeParams.waveAmp + "%";
+        if (currentMode === 'PULSE') mainDisplay.innerText = modeParams.pulseStrength + "%";
+        if (currentMode === 'RANDOM') mainDisplay.innerText = modeParams.randomStrength + "%";
+        if (currentMode === 'BURST') mainDisplay.innerText = modeParams.burstSpeed + "%";
+        if (currentMode === 'RAMP') mainDisplay.innerText = modeParams.rampPeak + "%";
+        if (currentMode === 'RHYTHM') mainDisplay.innerText = modeParams.rhythmStrength + "%";
+        if (currentMode === 'STAIRCASE') mainDisplay.innerText = modeParams.stairMax + "%";
     }
 
     // ==========================================
@@ -296,9 +444,7 @@
     function startDeviceMode() {
         isHost = true;
         show('deviceUI');
-        document.getElementById('sharedControls').classList.remove('hidden'); // Show controls immediately
-
-        // Fire PiP keep-alive inside the INIT tap gesture (Android only)
+        document.getElementById('sharedControls').classList.remove('hidden');
         enablePiPKeepAlive();
 
         const shortId = Math.floor(1000 + Math.random() * 9000).toString();
@@ -314,63 +460,50 @@
         });
     }
 
-    // Handles commands from Network OR Local UI
     function handleCommand(data) {
-        // Stop Logic
         if (data.mode === 'STOP') {
             stopLoop();
             writeToBluetooth(0);
             currentMode = 'STEADY';
-            if(isHost) setMode('STEADY'); // Sync UI
+            modeParams.steadyStrength = 0;
+            syncUIToParams();
+            updateUIForMode('STEADY');
             log("CMD: STOP");
             return;
         }
 
-        // Mode Switch Logic
         if (data.mode && data.mode !== currentMode) {
+            const prevMode = currentMode;
             currentMode = data.mode;
+            if (prevMode === 'MIC' && currentMode !== 'MIC') stopMicCapture();
             stopLoop();
             writeToBluetooth(0);
-            
-            // Sync UI if command came from Remote
-            if (isHost) {
-                document.querySelectorAll('#sharedControls button').forEach(b => b.classList.remove('active'));
-                document.getElementById('btn-' + currentMode).classList.add('active');
-            }
-
-            setTimeout(() => {
-                if (currentMode !== 'STEADY' && currentMode !== 'TOUCH' && currentMode !== 'MIC') {
-                    startLoop(data.val);
-                }
-            }, 50);
+            updateUIForMode(currentMode);
         }
-        // Value Update Logic
-        else {
-            if (currentMode === 'STEADY' || currentMode === 'TOUCH' || currentMode === 'MIC') {
-                writeToBluetooth(mapMotor(data.val));
-            } else {
-                startLoop(data.val);
-            }
-        }
-    }
 
-    // Direct Local Control wrapper
-    function handleLocalCommand(val) {
-        if (currentMode === 'STEADY' || currentMode === 'TOUCH' || currentMode === 'MIC') {
-            writeToBluetooth(mapMotor(val));
+        if (data.params) {
+            modeParams = { ...modeParams, ...data.params };
+        }
+
+        syncUIToParams();
+
+        if (currentMode === 'STEADY') {
+            writeToBluetooth(mapMotor(modeParams.steadyStrength));
+        } else if (currentMode === 'TOUCH' || currentMode === 'MIC') {
+            if (data.directVal !== undefined && data.directVal !== null) {
+                document.getElementById('displayVal').innerText = data.directVal + "%";
+                writeToBluetooth(mapMotor(data.directVal));
+            }
         } else {
-            startLoop(val);
+            ensureLoopRunning();
         }
     }
 
-function mapMotor(val) {
-    if (val <= 2) return 0; // Sigurna nula za kočnicu na ESP32
-    
-    const minPwm = 120; // Tvoj početni "kick" gdje motor zapravo kreće raditi
-    
-    // Linearno pretvara slider (3% - 100%) u raspon od 120 do 255 PWM
-    return Math.floor(((val / 100) * (255 - minPwm)) + minPwm);
-}
+    function mapMotor(val) {
+        if (val <= 2) return 0; 
+        const minPwm = 120; 
+        return Math.floor(((val / 100) * (255 - minPwm)) + minPwm);
+    }
 
     // ==========================================
     //  REMOTE LOGIC
@@ -386,21 +519,19 @@ function mapMotor(val) {
         if (!code) return alert("NO_ID");
         document.getElementById('connectRemoteBtn').innerText = "CONNECTING...";
 
-        // Fire PiP keep-alive inside the user gesture (Android only)
         enablePiPKeepAlive();
-
         conn = peer.connect(code);
 
         conn.on('open', () => {
             document.getElementById('connectRemoteBtn').innerText = "LINK_ESTABLISHED";
             document.getElementById('connectRemoteBtn').style.color = "var(--accent)";
-            document.getElementById('remoteUI').classList.add('hidden'); // Hide login inputs
-            document.getElementById('sharedControls').classList.remove('hidden'); // Show controls
+            document.getElementById('remoteUI').classList.add('hidden');
+            document.getElementById('sharedControls').classList.remove('hidden');
         });
     }
 
     // ==========================================
-    //  PIP KEEP-ALIVE (prevents Android background throttling)
+    //  PIP KEEP-ALIVE
     // ==========================================
     let pipStreamReady = false;
     function preparePiPStream() {
@@ -413,7 +544,7 @@ function mapMotor(val) {
         (function draw() {
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#ff4500';
+            ctx.fillStyle = '#b026ff';
             ctx.font = '14px monospace';
             ctx.fillText('LINK ACTIVE', 10, 30);
             ctx.fillStyle = '#e0e0e0';
@@ -435,60 +566,194 @@ function mapMotor(val) {
             if (document.pictureInPictureElement === video) return;
             await video.play();
             await video.requestPictureInPicture();
-        } catch (e) {
-            // User may have dismissed or browser blocked; silent fail
-        }
+        } catch (e) {}
     }
 
-    // Throttled Network Sending
-    function queueNetworkUpdate(val) {
-        pendingVal = val;
+    function queueNetworkParams() {
         if (!sendTimer) sendTimer = setTimeout(flushNetworkData, SEND_INTERVAL);
     }
 
     function flushNetworkData() {
-        if (pendingVal !== null && pendingVal !== lastSentVal) {
+        let payload = { mode: currentMode, params: modeParams };
+        if (currentMode === 'TOUCH' || currentMode === 'MIC') {
+            payload.directVal = pendingDirectVal;
+        }
+        
+        const payloadStr = JSON.stringify(payload);
+        if (payloadStr !== lastSentStr) {
             if (conn && conn.open) {
-                conn.send({ mode: currentMode, val: pendingVal });
-                lastSentVal = pendingVal;
+                conn.send(payload);
+                lastSentStr = payloadStr;
             }
         }
         sendTimer = null;
-        if (pendingVal !== lastSentVal) sendTimer = setTimeout(flushNetworkData, SEND_INTERVAL);
     }
 
-    function forceNetworkSend(val) {
+    function forceNetworkSend() {
         if (sendTimer) clearTimeout(sendTimer);
         sendTimer = null;
-        pendingVal = val;
-        flushNetworkData();
+        if (conn && conn.open) {
+            conn.send({ mode: currentMode, params: modeParams });
+        }
     }
 
     // ==========================================
-    //  ANIMATION LOOP (20Hz)
+    //  ANIMATION LOOP PROCESSING (20Hz)
     // ==========================================
     let animTick = 0;
-    function startLoop(param) {
-        if (loopId) clearInterval(loopId);
+    let wavePhase = 0;
+    let pulseState = 'ON';
+    let pulseCounter = 0;
+    let randomCounter = 0;
+    let randomCurrentOutput = 0;
+
+    // Mode specific tracking state variables
+    let rampCurrent = 120;
+    let rampDirection = 1;
+    let rhythmStep = 0;
+    let rhythmTickCounter = 0;
+    let stairCurrentStep = 0;
+    let stairDirection = 1;
+    let stairTickCounter = 0;
+
+    function ensureLoopRunning() {
+        if (loopId) return; 
         loopId = setInterval(() => {
             let output = 0;
-            const speed = Math.max(1, param);
 
             switch (currentMode) {
-                case 'PULSE': 
-                    const p_cycle = Math.max(4, 40 - (speed / 3)); 
-                    output = (animTick % p_cycle < p_cycle/2) ? 255 : 0; break;
-                case 'WAVE':
-                    const freq = speed / 10; 
-                    const sine = Math.sin(animTick * freq);
-                    output = Math.floor(((sine + 1) / 2) * 115) + 140; break;
-                case 'BURST':
-                    const b_cycle = animTick % (40 - (speed/4)); 
-                    output = (b_cycle < 2 || (b_cycle > 4 && b_cycle < 6)) ? 255 : 0; break;
-                case 'RANDOM':
-                    if (animTick % 5 === 0) output = Math.random() > 0.5 ? 255 : 0; else return; break;
+                case 'PULSE': {
+                    const onTicks = Math.max(1, Math.floor((modeParams.pulseOn / 100) * 39) + 1);
+                    const offTicks = Math.max(1, Math.floor((modeParams.pulseOff / 100) * 39) + 1);
+                    
+                    if (pulseState === 'ON') {
+                        output = mapMotor(modeParams.pulseStrength);
+                        pulseCounter++;
+                        if (pulseCounter >= onTicks) {
+                            pulseState = 'OFF';
+                            pulseCounter = 0;
+                        }
+                    } else {
+                        output = 0;
+                        pulseCounter++;
+                        if (pulseCounter >= offTicks) {
+                            pulseState = 'ON';
+                            pulseCounter = 0;
+                        }
+                    }
+                    break;
+                }
+                case 'WAVE': {
+                    const freqDelta = (modeParams.waveFreq / 100) * 0.4 + 0.02;
+                    wavePhase += freqDelta;
+                    
+                    const maxPwm = mapMotor(modeParams.waveAmp);
+                    if (maxPwm <= 0) {
+                        output = 0;
+                    } else {
+                        const minPwm = 120;
+                        const sine = Math.sin(wavePhase);
+                        const normSine = (sine + 1) / 2; 
+                        output = Math.floor(minPwm + normSine * (maxPwm - minPwm));
+                    }
+                    break;
+                }
+                case 'BURST': {
+                    const speed = Math.max(1, modeParams.burstSpeed);
+                    const b_cycle = animTick % Math.max(4, Math.floor(40 - (speed / 4))); 
+                    output = (b_cycle < 2 || (b_cycle > 4 && b_cycle < 6)) ? 255 : 0;
+                    animTick++;
+                    break;
+                }
+                case 'RANDOM': {
+                    const targetTicks = Math.max(1, Math.floor(((100 - modeParams.randomSpeed) / 100) * 25) + 1);
+                    if (randomCounter >= targetTicks) {
+                        randomCounter = 0;
+                        if (modeParams.randomStrength <= 2) {
+                            randomCurrentOutput = 0;
+                        } else {
+                            const maxPwm = mapMotor(modeParams.randomStrength);
+                            const minPwm = 120;
+                            randomCurrentOutput = Math.random() > 0.3 ? Math.floor(minPwm + Math.random() * (maxPwm - minPwm)) : 0;
+                        }
+                    }
+                    randomCounter++;
+                    output = randomCurrentOutput;
+                    break;
+                }
+                case 'RAMP': {
+                    const maxPwm = mapMotor(modeParams.rampPeak);
+                    if (maxPwm <= 0) {
+                        output = 0;
+                    } else {
+                        const minPwm = 120;
+                        const attackTicks = Math.max(2, Math.floor((modeParams.rampAttack / 100) * 80));
+                        const decayTicks = Math.max(2, Math.floor((modeParams.rampDecay / 100) * 80));
+
+                        if (rampDirection === 1) {
+                            rampCurrent += (maxPwm - minPwm) / attackTicks;
+                            if (rampCurrent >= maxPwm) {
+                                rampCurrent = maxPwm;
+                                rampDirection = -1;
+                            }
+                        } else {
+                            rampCurrent -= (maxPwm - minPwm) / decayTicks;
+                            if (rampCurrent <= minPwm) {
+                                rampCurrent = minPwm;
+                                rampDirection = 1;
+                            }
+                        }
+                        output = Math.floor(rampCurrent);
+                    }
+                    break;
+                }
+                case 'RHYTHM': {
+                    const patterns = [
+                        [1, 0, 1, 0, 0, 0, 0, 0], // P1: Syncopated Heartbeat
+                        [1, 1, 0, 1, 1, 0, 0, 0], // P2: Fast Double Cut
+                        [1, 0, 1, 0, 1, 1, 1, 0], // P3: Rolling Gallop
+                        [1, 1, 1, 1, 0, 0, 0, 0]  // P4: Extended Block Blocks
+                    ];
+                    const pIdx = Math.min(3, Math.floor(modeParams.rhythmPattern / 25));
+                    const activePattern = patterns[pIdx];
+                    const ticksPerStep = Math.max(1, Math.floor(((101 - modeParams.rhythmTempo) / 100) * 15));
+
+                    rhythmTickCounter++;
+                    if (rhythmTickCounter >= ticksPerStep) {
+                        rhythmTickCounter = 0;
+                        rhythmStep = (rhythmStep + 1) % activePattern.length;
+                    }
+                    output = activePattern[rhythmStep] === 1 ? mapMotor(modeParams.rhythmStrength) : 0;
+                    break;
+                }
+                case 'STAIRCASE': {
+                    const numSteps = Math.max(2, Math.floor((modeParams.stairSteps / 100) * 6) + 2);
+                    const ticksPerStep = Math.max(2, Math.floor((modeParams.stairDuration / 100) * 30) + 2);
+
+                    stairTickCounter++;
+                    if (stairTickCounter >= ticksPerStep) {
+                        stairTickCounter = 0;
+                        stairCurrentStep += stairDirection;
+                        if (stairCurrentStep >= numSteps - 1) {
+                            stairCurrentStep = numSteps - 1;
+                            stairDirection = -1;
+                        } else if (stairCurrentStep <= 0) {
+                            stairCurrentStep = 0;
+                            stairDirection = 1;
+                        }
+                    }
+
+                    const maxPwm = mapMotor(modeParams.stairMax);
+                    if (maxPwm <= 0) {
+                        output = 0;
+                    } else {
+                        const minPwm = 120;
+                        const ratio = stairCurrentStep / (numSteps - 1);
+                        output = Math.floor(minPwm + ratio * (maxPwm - minPwm));
+                    }
+                    break;
+                }
             }
-            animTick++;
             if (output > 0) output = Math.round(output / 5) * 5; 
             writeToBluetooth(output);
         }, 50); 
@@ -497,6 +762,18 @@ function mapMotor(val) {
     function stopLoop() {
         if (loopId) clearInterval(loopId);
         loopId = null;
+        animTick = 0;
+        pulseCounter = 0;
+        pulseState = 'ON';
+        randomCounter = 0;
+        randomCurrentOutput = 0;
+        rampCurrent = 120;
+        rampDirection = 1;
+        rhythmStep = 0;
+        rhythmTickCounter = 0;
+        stairCurrentStep = 0;
+        stairDirection = 1;
+        stairTickCounter = 0;
     }
 
     // ==========================================
@@ -579,8 +856,7 @@ function mapMotor(val) {
         micAnalyser = null;
         const bar = document.getElementById('micBar');
         if (bar) bar.style.width = "0%";
-        // Force motor to zero on exit
-        if (isHost) handleLocalCommand(0); else forceNetworkSend(0);
+        if (isHost) writeToBluetooth(0); else handleInput(0);
     }
 
     // ==========================================
@@ -590,7 +866,6 @@ function mapMotor(val) {
     let btWriteInProgress = false;
 
     async function connectBluetooth() {
-        // Fire PiP keep-alive inside the user gesture (Android only)
         enablePiPKeepAlive();
         try {
             const device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
@@ -604,7 +879,7 @@ function mapMotor(val) {
         } catch (e) { log("BT_ERR: " + e.message); }
     }
 
-async function writeToBluetooth(val) {
+    async function writeToBluetooth(val) {
         if (!btChar) return;
         val = Math.floor(val); 
         if (val === lastWrittenVal) return;
@@ -612,10 +887,7 @@ async function writeToBluetooth(val) {
 
         try {
             btWriteInProgress = true;
-            
-            // SEND AS A SINGLE BYTE (0x00 to 0xFF)
             const data = new Uint8Array([val]);
-            
             await btChar.writeValueWithoutResponse(data);
             lastWrittenVal = val;
         } catch(e) { } finally { btWriteInProgress = false; }
@@ -631,7 +903,7 @@ async function writeToBluetooth(val) {
     tp.addEventListener('pointermove', e => { if (e.buttons > 0) handleTouch(e); });
     tp.addEventListener('pointerup', () => { 
         mark.style.display = 'none'; 
-        handleInput(0); // Instant zero on release
+        handleInput(0); 
     });
 
     function handleTouch(e) {
@@ -647,6 +919,7 @@ async function writeToBluetooth(val) {
         document.getElementById('loginScreen').classList.add('hidden');
         document.getElementById(id).classList.remove('hidden');
     }
+    
     function log(msg) {
         const l = document.getElementById('log');
         l.innerHTML = `> ${msg}<br>` + l.innerHTML;
